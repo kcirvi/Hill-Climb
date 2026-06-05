@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Hill Climb Racing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:#0a0a16;display:flex;justify-content:center;align-items:center;
+  height:100vh;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;
+  touch-action:none;user-select:none;-webkit-user-select:none
+}
+#gameContainer{
+  position:relative;border:3px solid #e94560;border-radius:12px;overflow:hidden;
+  box-shadow:0 0 60px rgba(233,69,96,.2);transform-origin:center center
+}
+
+canvas{display:block;background:#87ceeb}
+#ui{
+  position:absolute;top:0;left:0;right:0;padding:10px 14px;
+  display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10
+}
+#ui .lbl{color:rgba(255,255,255,.85);font-size:11px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.8);letter-spacing:.4px}
+#fuelOuter{
+  width:130px;height:13px;margin-top:2px;
+  background:rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.5);border-radius:7px;
+  overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,.4)
+}
+#fuelFill{height:100%;width:100%;border-radius:5px;transition:width .1s;background:linear-gradient(90deg,#ff2d55,#ff9500,#ffcc00,#34c759)}
+.stat{color:#fff;font-size:21px;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.9);line-height:1.2}
+.stat small{font-size:12px;opacity:.6;font-weight:400}
+#controls{
+  position:absolute;bottom:12px;left:0;right:0;
+  display:flex;justify-content:space-between;padding:0 12px;pointer-events:none;z-index:10
+}
+.btn{
+  width:62px;height:62px;border-radius:50%;
+  background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.18);
+  color:rgba(255,255,255,.85);font-size:24px;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:auto;cursor:pointer;backdrop-filter:blur(4px);
+  transition:background .12s,transform .08s
+}
+.btn:active{background:rgba(255,255,255,.25);transform:scale(.9)}
+#gasBtn{border-color:rgba(52,199,89,.4);color:#34c759}
+#gasBtn:active{background:rgba(52,199,89,.2)}
+#brakeBtn{border-color:rgba(255,45,85,.4);color:#ff2d55}
+#brakeBtn:active{background:rgba(255,45,85,.2)}
+#tip{
+  position:absolute;bottom:88px;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,.25);font-size:11px;pointer-events:none;z-index:5;white-space:nowrap
+}
+#overlay{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.78);display:none;flex-direction:column;align-items:center;
+  justify-content:center;z-index:20;backdrop-filter:blur(6px)
+}
+#overlay.show{display:flex}
+#overlay h1{color:#ff2d55;font-size:38px;text-shadow:0 4px 20px rgba(255,45,85,.4);margin-bottom:4px}
+#overlay .sub{color:rgba(255,255,255,.7);font-size:16px;margin-bottom:16px}
+.ov-row{color:#fff;font-size:22px;margin-bottom:4px}
+.ov-row small{font-size:13px;opacity:.6}
+#restartBtn{
+  margin-top:16px;padding:12px 42px;font-size:16px;font-weight:600;
+  background:linear-gradient(135deg,#e94560,#ff2d55);border:none;border-radius:30px;
+  color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(233,69,96,.4);
+  transition:transform .12s,box-shadow .12s
+}
+#restartBtn:hover{transform:scale(1.04);box-shadow:0 6px 30px rgba(233,69,96,.55)}
+#restartBtn:active{transform:scale(.95)}
+#startOverlay{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.85);display:none;flex-direction:column;align-items:center;
+  justify-content:center;z-index:30;backdrop-filter:blur(8px)
+}
+#startOverlay.show{display:flex}
+#startBtn:hover{transform:scale(1.05)}
+#startBtn:active{transform:scale(.95)}
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+<canvas id="gameCanvas"></canvas>
+
+<div id="ui">
+  <div>
+    <div class="lbl">⛽ ТОПЛИВО</div>
+    <div id="fuelOuter"><div id="fuelFill" style="width:100%"></div></div>
+  </div>
+  <div style="text-align:right">
+    <div class="lbl">📏 ДИСТАНЦИЯ</div>
+    <div id="uiDist" class="stat">0 <small>м</small></div>
+    <div class="lbl" style="margin-top:2px">⭐ МОНЕТКИ</div>
+    <div id="uiScore" class="stat">0</div>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="btn" id="brakeBtn">←</div>
+  <div class="btn" id="gasBtn">→</div>
+</div>
+
+<div id="tip">↑/W — газ · ↓/S — тормоз · A/D — наклон · R — рестарт</div>
+
+<div id="overlay">
+  <h1 id="ovTitle">💥 ПЕРЕВОРОТ</h1>
+  <div class="sub" id="ovSub">Машина перевернулась!</div>
+  <div class="ov-row">Дистанция: <span id="ovDist">0</span> <small>м</small></div>
+  <div class="ov-row">Монетки: <span id="ovScore">0</span></div>
+  <button id="restartBtn">🔄 ЗАНОВО</button>
+</div>
+
+<div id="startOverlay">
+  <h1 style="color:#34c759;font-size:44px;text-shadow:0 4px 20px rgba(52,199,89,.4)">🏔 Hill Climb</h1>
+  <div class="sub" style="font-size:18px;margin-bottom:20px;color:rgba(255,255,255,.6)">Покоряй холмы и собирай монеты!</div>
+  <button id="startBtn" style="padding:14px 52px;font-size:18px;font-weight:700;background:linear-gradient(135deg,#34c759,#28a745);border:none;border-radius:30px;color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(52,199,89,.4);transition:transform .12s">🚀 СТАРТ</button>
+  <div style="margin-top:22px;color:rgba(255,255,255,.35);font-size:12px">↑/W — газ · ↓/S — тормоз · A/D — наклон</div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+// ───────────────────────────────────────────────────────────
+//  HILL CLIMB RACING  —  Matter.js  —  Kenney sprites
+// ───────────────────────────────────────────────────────────
+
+const { Engine, Bodies, Body, Composite, Constraint, Events } = Matter;
+
+const canvas = document.getElementById('gameCanvas');
+const W = 1000, H = 560;
+canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d');
+
+const fuelFill = document.getElementById('fuelFill');
+const uiDist  = document.getElementById('uiDist');
+const uiScore = document.getElementById('uiScore');
+const overlay = document.getElementById('overlay');
+const startOverlay = document.getElementById('startOverlay');
+const startBtn = document.getElementById('startBtn');
+const ovTitle = document.getElementById('ovTitle');
+const ovSub   = document.getElementById('ovSub');
+const ovDist  = document.getElementById('ovDist');
+const ovScore = document.getElementById('ovScore');
+
+const GRAVITY       = 0.35;
+const FUEL_MAX      = 100;
+const FUEL_RATE     = 0.08;
+const FUEL_BONUS    = 30;
+const COIN_SCORE    = 10;
+const MAX_WHEEL_SPD = 0.948;
+const LERP_WHEEL    = 0.15;
+
+const BODY_W   = 88;
+const BODY_H   = 16;
+const WHEEL_R  = 14;
+const WHEEL_B  = 81;
+const SUSP_LEN = 14;
+
+const DECOR = [
+  {key:'corn', scale:.19},
+  {key:'cornD',scale:.23},
+  {key:'cornY',scale:.13},
+  {key:'cornY2',scale:.15},
+];
+
+// ─── SPRITE SHEETS ──────────────────────────────────────
+const IMG = {
+  farm: { el: new Image(), path: 'farm_tiles.png',       tw: 18, cols: 16 },
+  urban:{ el: new Image(), path: 'urban_tiles.png',      tw: 16, cols: 27 },
+  plane:{ el: new Image(), path: 'planeRed1.png',        tw: 88, th: 73 },
+  star: { el: new Image(), path: 'starGold.png',         tw: 39, th: 38 },
+  bg:   { el: new Image(), path: 'background.png',       tw: 800,th: 480 },
+  car:  { el: new Image(), path: 'noroot1.png',       tw: 1680, th: 456 },
+  corn:{ el: new Image(), path: 'corn.png',   tw: 256, th: 512 },
+  cornD:{el: new Image(), path: 'cornD.png',  tw: 256, th: 512 },
+  cornY:{el: new Image(), path: 'cornY.png',  tw: 256, th: 512 },
+  cornY2:{el:new Image(), path: 'cornY2.png', tw: 256, th: 512 },
+};
+
+const SCALE = 2; // tile scale for farm/urban
+
+// Tile config (tune with T key viewer)
+const TILE = {
+  grass: [48,49,50,51],
+  dirt: 48,
+};
+
+let showTiles = false, tilePage = 0;
+let dirtPat = null;
+let frame = 0;
+
+function makePattern(sheet, idx, tw, cols) {
+  const sx = (idx % cols) * tw, sy = Math.floor(idx / cols) * tw;
+  const c = document.createElement('canvas');
+  c.width = tw * SCALE; c.height = tw * SCALE;
+  const cx = c.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  cx.drawImage(sheet, sx, sy, tw, tw, 0, 0, c.width, c.height);
+  return ctx.createPattern(c, 'repeat');
+}
+
+function drawTile(sheet, idx, tw, cols, x, y, s) {
+  s = s || SCALE;
+  const sx = (idx % cols) * tw, sy = Math.floor(idx / cols) * tw;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sheet, sx, sy, tw, tw, x, y, tw * s, tw * s);
+}
+
+function initPatterns() {
+  if (!IMG.farm.el.naturalWidth) return;
+  dirtPat = makePattern(IMG.farm.el, TILE.dirt, IMG.farm.tw, IMG.farm.cols);
+}
+
+// ─── STATE ──────────────────────────────────────────────
+let engine, world, car, level;
+let score = 0, gameOver = false, goTimer = null;
+let cameraX = 0, startX = 0, maxDist = 0;
+const keys = { gas:false, brake:false, tiltFwd:false, tiltBwd:false };
+let gasHold = 0;
+const BOOST_RAMP = 150;
+let clouds = [];
+
+// ───────────────────────────────────────────────────────────
+//  1. LEVEL
+// ───────────────────────────────────────────────────────────
+
+function generateLevel() {
+  const step = 22;
+  const heights = [];
+  const waves = [
+    [40+Math.random()*30, 0.002+Math.random()*0.001, Math.random()*6],
+    [18+Math.random()*20, 0.005+Math.random()*0.003, Math.random()*6],
+    [10+Math.random()*10, 0.01+Math.random()*0.005, Math.random()*6],
+    [5+Math.random()*6, 0.015+Math.random()*0.005, Math.random()*6],
+    [3+Math.random()*4, 0.025+Math.random()*0.01, Math.random()*6],
+    [2+Math.random()*3, 0.008+Math.random()*0.004, Math.random()*6],
+  ];
+  function heightAt(x) {
+    let y = 380;
+    for (const [a,f,p] of waves) y -= Math.sin(x*f+p)*a + Math.cos(x*f*0.7+p*1.3)*a*0.15;
+    return y;
+  }
+  function buildChunk(xs, xe) {
+    const h=[], depth=H+100, segW=12;
+    for (let x=xs; x<=xe; x+=step) h.push(heightAt(x));
+    const bodies=[];
+    for (let x=xs; x<xe; x+=segW) {
+      const x1=x===xs?x:x-2, x2=Math.min(x+segW,xe);
+      const y1=Math.min(heightAt(x1),H-2), y2=Math.min(heightAt(x2),H-2);
+      const cx=(x1+x2)/2, cy=(y1+y2+depth)/2;
+      const body=Body.create({
+        position:{x:cx,y:cy},
+        vertices:[{x:x1,y:y1},{x:x2,y:y2},{x:x2,y:y2+depth},{x:x1,y:y1+depth}],
+        isStatic:true,friction:.9,restitution:.03,label:'terrain'
+      });
+      bodies.push(body);
+    }
+    return {heights:h,bodies,xStart:xs,xEnd:xe};
+  }
+  const c = buildChunk(0, 6000);
+  heights.push(...c.heights);
+  const coins=[],fuelCans=[], decorations=[];
+
+  function tryPlace(arr,label,w,h,slopeMax,distMin,stepOff,ytOff) {
+    for (let att=0; att<50; att++) {
+      const idx = stepOff + Math.floor(Math.random()*Math.max(1,heights.length-stepOff*2));
+      if (idx>=heights.length-2) return;
+      const x=idx*step, y=Math.min(heights[idx],H-2)+ytOff;
+      const sl = Math.abs(heights[idx+1]-heights[idx-1])/(step*2);
+      if (sl>slopeMax) continue;
+      if (arr.some(a=>Math.hypot(a.position.x-x,a.position.y-y)<distMin)) continue;
+      const b = label==='coin' ? Bodies.circle(x,y,w,{isSensor:true,isStatic:true,label}) : Bodies.rectangle(x,y,w,h,{isSensor:true,isStatic:true,label});
+      arr.push(b);
+      return;
+    }
+  }
+  for (let i=0; i<48; i++) tryPlace(coins,'coin',8,0,.9,100,25,-30);
+  for (let i=0; i<14; i++) tryPlace(fuelCans,'fuel',20,14,.7,250,30,-22);
+
+  // Place decorations along road
+  for (let i=0;i<900;i++) {
+    const idx=20+Math.floor(Math.random()*(heights.length-40));
+    if (idx>=heights.length-2) continue;
+    const x=idx*step, y=Math.min(heights[idx],H-2);
+    const sl=Math.abs(heights[idx+1]-heights[idx-1])/(step*2);
+    if (sl>.6||decorations.some(d=>Math.abs(d.x-x)<80)) continue;
+    const d=DECOR[Math.floor(Math.random()*DECOR.length)];
+    decorations.push({x,y,key:d.key,scale:d.scale});
+  }
+
+  const ld = { heights,step, bodies:c.bodies, coins,fuelCans, decorations, waves,heightAt,chunkStart:0,chunkEnd:6000,
+    extend(world,carX,margin) {
+      margin=margin||3000;
+      if (carX+margin<=this.chunkEnd) return false;
+      const ns=this.chunkEnd, nw=4000, ne=ns+nw;
+      const ch = buildChunk(ns+step,ne);
+      for (let i=1;i<ch.heights.length;i++) this.heights.push(ch.heights[i]);
+      Composite.add(world,ch.bodies); this.bodies.push(...ch.bodies);
+      this.chunkStart=ns; this.chunkEnd=ne;
+      // Place coins/fuel in new chunk
+      for (let i=0;i<10;i++) {
+        const ii = Math.floor(Math.random()*ch.heights.length*.7)+Math.floor(ch.heights.length*.15);
+        const gi = Math.round((ns+step)/step)+ii;
+        if (gi>=this.heights.length-2) continue;
+        const x=gi*step, y=Math.min(this.heights[gi],H-2)-20;
+        const sl=Math.abs(this.heights[gi+1]-this.heights[gi-1])/(step*2);
+        if (sl>.9||this.coins.some(c=>Math.hypot(c.position.x-x,c.position.y-y)<100)) continue;
+        const c=Bodies.circle(x,y-10,8,{isSensor:true,isStatic:true,label:'coin'});
+        Composite.add(world,c); this.coins.push(c);
+      }
+      for (let i=0;i<3;i++) {
+        const ii = Math.floor(Math.random()*ch.heights.length*.7)+Math.floor(ch.heights.length*.15);
+        const gi = Math.round((ns+step)/step)+ii;
+        if (gi>=this.heights.length-2) continue;
+        const x=gi*step, y=Math.min(this.heights[gi],H-2)-22;
+        const sl=Math.abs(this.heights[gi+1]-this.heights[gi-1])/(step*2);
+        if (sl>.7||this.fuelCans.some(f=>Math.hypot(f.position.x-x,f.position.y-y)<250)) continue;
+        const f=Bodies.rectangle(x,y,20,14,{isSensor:true,isStatic:true,label:'fuel'});
+        Composite.add(world,f); this.fuelCans.push(f);
+      }
+      // Place decorations in new chunk
+      for (let i=0;i<165;i++) {
+        const ii=Math.floor(Math.random()*ch.heights.length*.7)+Math.floor(ch.heights.length*.15);
+        const gi=Math.round((ns+step)/step)+ii;
+        if (gi>=this.heights.length-2) continue;
+        const x=gi*step, y=Math.min(this.heights[gi],H-2);
+        const sl=Math.abs(this.heights[gi+1]-this.heights[gi-1])/(step*2);
+        if (sl>.6||this.decorations.some(d=>Math.abs(d.x-x)<80)) continue;
+        const di=DECOR[Math.floor(Math.random()*DECOR.length)];
+        this.decorations.push({x,y,key:di.key,scale:di.scale});
+      }
+      return true;
+    }
+  };
+  return ld;
+}
+
+// ───────────────────────────────────────────────────────────
+//  2. CAR
+// ───────────────────────────────────────────────────────────
+
+function createCar(x,y) {
+  const wY = y + BODY_H/2 + SUSP_LEN;
+  const body = Bodies.rectangle(x,y,BODY_W,BODY_H,{density:.0000313,friction:.5,restitution:.06,label:'car-body',chamfer:{radius:2}});
+  const wL = Bodies.circle(x-WHEEL_B/2,wY,WHEEL_R,{density:.0001067,friction:.141,restitution:.15,label:'car-wheel'});
+  const wR = Bodies.circle(x+WHEEL_B/2,wY,WHEEL_R,{density:.0001247,friction:.141,restitution:.15,label:'car-wheel'});
+  const cL = Constraint.create({bodyA:body,pointA:{x:-WHEEL_B/2,y:wY-y},bodyB:wL,pointB:{x:0,y:0},stiffness:1,length:0,label:'susp'});
+  const cR = Constraint.create({bodyA:body,pointA:{x:WHEEL_B/2,y:wY-y},bodyB:wR,pointB:{x:0,y:0},stiffness:1,length:0,label:'susp'});
+  return {body,wL,wR,cL,cR,fuel:FUEL_MAX,alive:true};
+}
+
+// ───────────────────────────────────────────────────────────
+//  3. INIT
+// ───────────────────────────────────────────────────────────
+
+function initGame() {
+  if (engine) Events.off(engine,'collisionStart',onCollision);
+  score=0; gameOver=false; maxDist=0;
+  if (goTimer) { clearTimeout(goTimer); goTimer=null; }
+  overlay.classList.remove('show');
+  engine=Engine.create({gravity:{x:0,y:GRAVITY},positionIterations:10,velocityIterations:8});
+  world=engine.world;
+  level=generateLevel();
+  Composite.add(world,level.bodies);
+  Composite.add(world,level.coins);
+  Composite.add(world,level.fuelCans);
+  startX=200;
+  const startY = level.heights[Math.round(startX/level.step)]-BODY_H/2-SUSP_LEN-WHEEL_R-2;
+  car=createCar(startX,startY);
+  Composite.add(world,[car.body,car.wL,car.wR,car.cL,car.cR]);
+  cameraX=startX-W*.3;
+  initClouds();
+  Events.on(engine,'collisionStart',onCollision);
+}
+
+// ───────────────────────────────────────────────────────────
+//  4. COLLISIONS
+// ───────────────────────────────────────────────────────────
+
+function onCollision(evt) {
+  for (const p of evt.pairs) {
+    const a=p.bodyA,b=p.bodyB,la=[a.label,b.label];
+    const hasCar = la.includes('car-body')||la.includes('car-wheel');
+    if (la.includes('coin')&&hasCar) {
+      const c=a.label==='coin'?a:b, i=level.coins.indexOf(c);
+      if (i!==-1) { Composite.remove(world,c); level.coins.splice(i,1); score+=COIN_SCORE; }
+    }
+    if (la.includes('fuel')&&hasCar) {
+      const f=a.label==='fuel'?a:b, i=level.fuelCans.indexOf(f);
+      if (i!==-1) { Composite.remove(world,f); level.fuelCans.splice(i,1); car.fuel=Math.min(FUEL_MAX,car.fuel+FUEL_BONUS); }
+    }
+  }
+}
+
+// ───────────────────────────────────────────────────────────
+//  5. CLOUDS
+// ───────────────────────────────────────────────────────────
+
+function initClouds() {
+  clouds=[];
+  for (let i=0;i<12;i++) clouds.push({x:Math.random()*W*4-W,y:20+Math.random()*120,w:60+Math.random()*110,speed:.15+Math.random()*.35,op:.2+Math.random()*.35});
+}
+function updateClouds() {
+  for (const c of clouds) { c.x-=c.speed; if (c.x+c.w<cameraX-60) { c.x=cameraX+W+40+Math.random()*150; c.y=20+Math.random()*120; } }
+}
+
+// ───────────────────────────────────────────────────────────
+//  6. GAME LOOP
+// ───────────────────────────────────────────────────────────
+
+function update() {
+  if (gameOver||!car.alive) return;
+  if (keys.gas&&car.fuel>0) { gasHold=Math.min(gasHold+1,BOOST_RAMP); const b=1+gasHold/BOOST_RAMP*.4; spin(MAX_WHEEL_SPD*b); car.fuel=Math.max(0,car.fuel-FUEL_RATE); }
+  else { gasHold=0; if (keys.brake) spin(-MAX_WHEEL_SPD*.4); else spin(0); }
+  const th = getTerrainH(car.body.position.x), inAir = car.body.position.y<th-30;
+  if (inAir) {
+    if (keys.tiltFwd) Body.setAngularVelocity(car.body,car.body.angularVelocity-.008);
+    if (keys.tiltBwd) Body.setAngularVelocity(car.body,car.body.angularVelocity+.008);
+  }
+  if (level.extend) level.extend(world,car.body.position.x,2000);
+  Engine.update(engine,1000/60);
+  cameraX=car.body.position.x-W*.3;
+  updateClouds(); frame++;
+  let a=car.body.angle%(Math.PI*2); if (a>Math.PI) a-=Math.PI*2; if (a<-Math.PI) a+=Math.PI*2;
+  if (Math.abs(a)>1.396&&!inAir) { car.alive=false; endGame('💥 ПЕРЕВОРОТ'); }
+  if (car.body.position.y>H+100) { car.alive=false; endGame('💥 ПАДЕНИЕ','Машина упала с трассы!'); }
+  if (car.fuel<=0) { car.alive=false; endGame('⛽ БЕНЗИН КОНЧИЛСЯ'); }
+  const dist = Math.max(0,Math.round((car.body.position.x-startX)/5));
+  if (dist>maxDist) maxDist=dist;
+  fuelFill.style.width=Math.max(0,Math.round(car.fuel/FUEL_MAX*100))+'%';
+  uiDist.innerHTML=maxDist+' <small>м</small>';
+  uiScore.textContent=score;
+}
+
+function spin(t) { [car.wL,car.wR].forEach(w=>Body.setAngularVelocity(w,w.angularVelocity+(t-w.angularVelocity)*LERP_WHEEL)); }
+
+function getTerrainH(x) {
+  return level.heightAt(x);
+}
+
+function endGame(t,s) {
+  gameOver=true; ovTitle.textContent=t; ovSub.textContent=s; ovDist.textContent=maxDist; ovScore.textContent=score;
+  goTimer=setTimeout(()=>overlay.classList.add('show'),600);
+}
+
+// ───────────────────────────────────────────────────────────
+//  7. RENDER
+// ───────────────────────────────────────────────────────────
+
+function render() {
+  ctx.clearRect(0,0,W,H);
+  drawBG();
+  drawObjects();
+  drawTerrain();
+  drawCar();
+  drawHUD();
+  if (showTiles) { if (tilePage===0) drawTileViewer(); else drawUrbanViewer(); }
+}
+
+function drawBG() {
+  if (IMG.bg.el.naturalWidth) {
+    // scale background to fill width, crop top
+    const scale = W/800, h = 480*scale;
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(IMG.bg.el,0,0,800,480,0,2,W,h);
+  } else {
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0b0b20'); g.addColorStop(.2,'#14143a'); g.addColorStop(.45,'#253a6a');
+    g.addColorStop(.75,'#5a8098'); g.addColorStop(1,'#8aa8b5');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+  // draw clouds on top
+  for (const c of clouds) {
+    const sx=c.x-cameraX;
+    if (sx<-150||sx>W+150) continue;
+    ctx.globalAlpha=c.op;
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    const r=c.w*.3;
+    ctx.beginPath();
+    ctx.arc(sx,c.y,r*1.2,0,Math.PI*2);
+    ctx.arc(sx+r*.6,c.y-r*.3,r,0,Math.PI*2);
+    ctx.arc(sx+r*1.3,c.y,r*.9,0,Math.PI*2);
+    ctx.arc(sx+r*.5,c.y+r*.1,r*.8,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawTerrain() {
+  const res = 8;
+  const si = Math.floor((cameraX - 20) / res);
+  const ei = Math.ceil((cameraX + W + 20) / res);
+  const clamp = y => Math.min(y, H - 2);
+
+  ctx.save();
+
+  // Underground fill with pattern
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = si * res; x <= ei * res; x += res) ctx.lineTo(x - cameraX, clamp(level.heightAt(x)));
+  ctx.lineTo(W, H); ctx.closePath();
+  if (dirtPat) {
+    ctx.save();
+    ctx.translate(-(cameraX % (IMG.farm.tw * SCALE)), 0);
+    ctx.fillStyle = dirtPat; ctx.fill();
+    ctx.restore();
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#5a4a3a'); g.addColorStop(.3, '#3a2a1a'); g.addColorStop(1, '#1a0a00');
+    ctx.fillStyle = g; ctx.fill();
+  }
+
+  // Smooth surface border — dark grass base
+  ctx.beginPath();
+  for (let x = si * res; x <= ei * res; x += res) {
+    const sx = x - cameraX, sy = clamp(level.heightAt(x));
+    x === si * res ? ctx.moveTo(sx, sy - 4) : ctx.lineTo(sx, sy - 4);
+  }
+  ctx.strokeStyle = '#3a7a2a'; ctx.lineWidth = 13; ctx.lineCap = 'round'; ctx.stroke();
+
+  // Bright grass top edge
+  ctx.beginPath();
+  for (let x = si * res; x <= ei * res; x += res) {
+    const sx = x - cameraX, sy = clamp(level.heightAt(x));
+    x === si * res ? ctx.moveTo(sx, sy - 7) : ctx.lineTo(sx, sy - 7);
+  }
+  ctx.strokeStyle = '#5aba3a'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawObjects() {
+  const cam=cameraX;
+  const useStar = IMG.star.el.naturalWidth>0;
+
+  // Decorations (rocks, grass, clouds from tappy-plane)
+  for (const d of level.decorations) {
+    const sx=d.x-cam;
+    if (sx<-60||sx>W+60) continue;
+    const img=IMG[d.key];
+    if (!img||!img.el.naturalWidth) continue;
+    const tw=img.tw, th=img.th, sc=d.scale;
+    ctx.imageSmoothingEnabled=true;
+    const dy=Math.min(d.y,H-2);
+    ctx.drawImage(img.el,0,0,tw,th,sx-tw*sc/2,dy-th*sc*6/7,tw*sc,th*sc);
+  }
+
+  // Coins
+  for (const c of level.coins) {
+    const sx=c.position.x-cam;
+    if (sx<-25||sx>W+25) continue;
+    if (useStar) {
+      const tw=IMG.star.tw, th=IMG.star.th, s=.7;
+      const bob = Math.sin(frame*0.06)*3;
+      ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(IMG.star.el,0,0,tw,th,sx-tw*s/2,c.position.y-th*s/2+bob,tw*s,th*s);
+    } else {
+      const r=6;
+      const g=ctx.createRadialGradient(sx-2,c.position.y-3,1,sx,c.position.y,r);
+      g.addColorStop(0,'#ffe066'); g.addColorStop(.6,'#ffc800'); g.addColorStop(1,'#cc9900');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,c.position.y,r,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#b8860b'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle='#8a6000'; ctx.font='bold 9px Arial';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('$',sx,c.position.y+1);
+    }
+  }
+
+  // Fuel cans — red stars
+  for (const f of level.fuelCans) {
+    const sx=f.position.x-cam;
+    if (sx<-25||sx>W+25) continue;
+    const r=13;
+    const bob = Math.sin(frame*0.08)*3;
+    ctx.save();
+    ctx.translate(sx,f.position.y+bob);
+    ctx.rotate(frame*0.02);
+    ctx.fillStyle='#e83030';
+    ctx.shadowColor='#ff4444'; ctx.shadowBlur=12;
+    ctx.beginPath();
+    for (let i=0;i<10;i++) {
+      const a=-Math.PI/2+(i/10)*Math.PI*2;
+      const rad=i%2===0?r:r*0.4;
+      const px=Math.cos(a)*rad, py=Math.sin(a)*rad;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#ff6666';
+    ctx.beginPath();
+    for (let i=0;i<10;i++) {
+      const a=-Math.PI/2+(i/10)*Math.PI*2;
+      const rad=i%2===0?r-4:(r-4)*0.4;
+      const px=Math.cos(a)*rad, py=Math.sin(a)*rad;
+      i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawCar() {
+  if (!car||!car.alive&&!gameOver) return;
+  const pos=car.body.position, ang=car.body.angle;
+  const cx=pos.x-cameraX, cy=pos.y;
+  const hbw=BODY_W/2, hbh=BODY_H/2;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(ang);
+
+  // suspension lines
+  ctx.strokeStyle='#555'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(-WHEEL_B/2, hbh); ctx.lineTo(-WHEEL_B/2, hbh+SUSP_LEN);
+  ctx.moveTo( WHEEL_B/2, hbh); ctx.lineTo( WHEEL_B/2, hbh+SUSP_LEN);
+  ctx.stroke();
+
+  // body shadow
+  ctx.fillStyle='rgba(0,0,0,.2)'; roundRect(ctx,-hbw+2,-hbh+3,BODY_W,BODY_H,4); ctx.fill();
+
+  // sprite model — smoothed to match body dimensions
+  if (IMG.car.el.naturalWidth) {
+    const cw=IMG.car.tw, ch=IMG.car.th;
+    const sc = BODY_W / cw * 1.5;
+    const dw=cw*sc, dh=ch*sc;
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(IMG.car.el,0,0,cw,ch,-dw/2+3,-hbh+(BODY_H-dh)/2+6,dw,dh);
+  } else {
+    // fallback canvas body
+    const g=ctx.createLinearGradient(0,-hbh,0,hbh);
+    g.addColorStop(0,'#e83030'); g.addColorStop(.5,'#c82020'); g.addColorStop(1,'#8a1515');
+    ctx.fillStyle=g; roundRect(ctx,-hbw,-hbh,BODY_W,BODY_H,4); ctx.fill();
+    ctx.strokeStyle='#6a0a0a'; ctx.lineWidth=1; ctx.stroke();
+    // windshield
+    ctx.fillStyle='#2a3a5a';
+    const ww=BODY_W*.4, wh=BODY_H*.45, wy=-hbh+BODY_H*.12;
+    roundRect(ctx,-ww/2,wy,ww,wh,2); ctx.fill();
+    ctx.fillStyle='#6abaf6'; ctx.globalAlpha=.3;
+    roundRect(ctx,-ww/2+2,wy+2,ww-4,wh-4,1); ctx.fill();
+    ctx.globalAlpha=1;
+    // headlights
+    ctx.fillStyle='#ffe066'; ctx.shadowColor='#ffe066'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(hbw-3,-hbh+6,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hbw-3, hbh-6,3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    // bumper
+    ctx.fillStyle='#444'; ctx.fillRect(hbw-6,-hbh+10,5,8);
+    ctx.fillRect(hbw-6, hbh-18,5,8);
+  }
+
+  ctx.restore();
+
+  // wheels
+  drawWheel(car.wL.position.x-cameraX, car.wL.position.y, car.wL.angularVelocity);
+  drawWheel(car.wR.position.x-cameraX, car.wR.position.y, car.wR.angularVelocity);
+}
+
+function roundRect(ctx,x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function drawWheel(x,y,angV) {
+  const r=WHEEL_R;
+  // tyre
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  // rim
+  ctx.fillStyle='#999'; ctx.beginPath(); ctx.arc(x,y,r-3,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ddd'; ctx.beginPath(); ctx.arc(x,y,r-5,0,Math.PI*2); ctx.fill();
+  // spokes
+  ctx.strokeStyle='#777'; ctx.lineWidth=2;
+  for (let i=0;i<5;i++) {
+    const a=angV*30+(i/5)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(x+Math.cos(a)*4,y+Math.sin(a)*4);
+    ctx.lineTo(x+Math.cos(a)*(r-3),y+Math.sin(a)*(r-3)); ctx.stroke();
+  }
+  // hub
+  ctx.fillStyle='#555'; ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+}
+
+function drawHUD() {
+  if (!car) return;
+  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.textBaseline='bottom';
+  ctx.fillText('Speed: '+Math.sqrt(car.body.velocity.x**2+car.body.velocity.y**2).toFixed(1),10,H-8);
+}
+
+// ───────────────────────────────────────────────────────────
+//  TILE VIEWER
+// ───────────────────────────────────────────────────────────
+
+function drawTileViewer() {
+  if (!IMG.farm.el.naturalWidth) return;
+  const cols=16, rows=7, ts=IMG.farm.tw*SCALE, gap=2, pad=10;
+  const pw=cols*(ts+gap)+pad*2, ph=rows*(ts+gap)+pad*2+20;
+  ctx.fillStyle='rgba(0,0,0,.85)'; ctx.fillRect(W/2-pw/2,H/2-ph/2,pw,ph);
+  ctx.fillStyle='#fff'; ctx.font='12px monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('Farm tiles — T: next',W/2,H/2-ph/2+4);
+  for (let i=0;i<cols*rows;i++) {
+    const gx=i%cols, gy=Math.floor(i/cols);
+    const x=W/2-pw/2+pad+gx*(ts+gap), y=H/2-ph/2+pad+20+gy*(ts+gap);
+    drawTile(IMG.farm.el,i,IMG.farm.tw,IMG.farm.cols,x,y);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='7px monospace'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(i,x+ts/2,y+ts);
+  }
+}
+
+function drawUrbanViewer() {
+  if (!IMG.urban.el.naturalWidth) return;
+  const cols=27, rows=6, ts=IMG.urban.tw*SCALE, gap=2, pad=8;
+  const pw=cols*(ts+gap)+pad*2, ph=rows*(ts+gap)+pad*2+20;
+  ctx.fillStyle='rgba(0,0,0,.9)'; ctx.fillRect(W/2-pw/2,H/2-ph/2,pw,ph);
+  ctx.fillStyle='#fff'; ctx.font='12px monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('Urban tiles — T: close',W/2,H/2-ph/2+4);
+  for (let i=0;i<cols*rows;i++) {
+    const gx=i%cols, gy=Math.floor(i/cols);
+    const x=W/2-pw/2+pad+gx*(ts+gap), y=H/2-ph/2+pad+20+gy*(ts+gap);
+    drawTile(IMG.urban.el,i,IMG.urban.tw,IMG.urban.cols,x,y);
+    ctx.fillStyle='rgba(255,255,255,.3)'; ctx.font='6px monospace'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(i,x+ts/2,y+ts);
+  }
+}
+
+// ───────────────────────────────────────────────────────────
+//  8. CONTROLS
+// ───────────────────────────────────────────────────────────
+
+function keyToAction(key,code) {
+  const k=key.toLowerCase();
+  if (k==='arrowup'||code==='KeyW'||k==='w') return 'gas';
+  if (k==='arrowdown'||code==='KeyS'||k==='s') return 'brake';
+  if (k==='arrowright'||code==='KeyD'||k==='d') return 'tiltFwd';
+  if (k==='arrowleft'||code==='KeyA'||k==='a') return 'tiltBwd';
+  return null;
+}
+
+document.addEventListener('keydown',e=>{
+  const a=keyToAction(e.key,e.code);
+  if (a) { keys[a]=true; e.preventDefault(); }
+  if (e.key==='r'||e.key==='R'||e.key==='к'||e.key==='К') initGame();
+  if ((e.key==='Enter'||e.code==='Enter')&&gameOver) initGame();
+  if (e.key==='t'||e.key==='T'||e.key==='е'||e.key==='Е') {
+    if (!showTiles) { showTiles=true; tilePage=0; }
+    else if (tilePage===0) tilePage=1;
+    else showTiles=false;
+  }
+});
+document.addEventListener('keyup',e=>{ const a=keyToAction(e.key,e.code); if (a) keys[a]=false; });
+
+function setupBtn(id,k) {
+  const el=document.getElementById(id); if (!el) return;
+  const s=e=>{e.preventDefault(); keys[k]=true;};
+  const e=e=>{e.preventDefault(); if(keys[k])keys[k]=false;};
+  el.addEventListener('mousedown',s); el.addEventListener('mouseup',e); el.addEventListener('mouseleave',e);
+  el.addEventListener('touchstart',s,{passive:false}); el.addEventListener('touchend',e,{passive:false}); el.addEventListener('touchcancel',e,{passive:false});
+}
+setupBtn('gasBtn','gas'); setupBtn('brakeBtn','brake');
+document.getElementById('restartBtn').addEventListener('click',initGame);
+document.getElementById('restartBtn').addEventListener('touchend',e=>{e.preventDefault(); initGame();});
+
+function scaleGame() {
+  const s=Math.min(1.5,(innerWidth-16)/W,(innerHeight-16)/H);
+  document.getElementById('gameContainer').style.transform=`scale(${s})`;
+}
+addEventListener('resize',scaleGame);
+addEventListener('orientationchange',()=>setTimeout(scaleGame,250));
+scaleGame();
+
+// ─── Load & GO ──────────────────────────────────────────
+let loaded=0;
+function start(){ initPatterns(); startOverlay.classList.add('show'); }
+function beginGame(){ startOverlay.classList.remove('show'); initGame(); (function loop(){ update(); render(); requestAnimationFrame(loop); })(); }
+function onLoad(){ if (++loaded>=10) start(); }
+function onErr(){ loaded++; if (loaded>=10) start(); }
+for (const k of Object.keys(IMG)) {
+  IMG[k].el.onload=onLoad; IMG[k].el.onerror=onErr; IMG[k].el.src=IMG[k].path;
+}
+startBtn.addEventListener('click',beginGame);
+startBtn.addEventListener('touchend',e=>{e.preventDefault(); beginGame();});
+document.addEventListener('keydown',function startKey(e){if ((e.key==='Enter'||e.key===' ')&&startOverlay.classList.contains('show')){beginGame();}});
+</script>
+</body>
+</html>
