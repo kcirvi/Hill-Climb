@@ -151,6 +151,8 @@ const FUEL_BONUS    = 30;
 const COIN_SCORE    = 10;
 const MAX_WHEEL_SPD = 0.948;
 const LERP_WHEEL    = 0.15;
+let particles = [];
+let speedStreaks = [];
 
 const BODY_W   = 88;
 const BODY_H   = 16;
@@ -357,7 +359,7 @@ function createCar(x,y) {
 
 function initGame() {
   if (engine) Events.off(engine,'collisionStart',onCollision);
-  score=0; gameOver=false; maxDist=0;
+  score=0; gameOver=false; maxDist=0; particles=[]; speedStreaks=[];
   if (goTimer) { clearTimeout(goTimer); goTimer=null; }
   overlay.classList.remove('show');
   engine=Engine.create({gravity:{x:0,y:GRAVITY},positionIterations:10,velocityIterations:8});
@@ -412,15 +414,21 @@ function updateClouds() {
 
 function update() {
   if (gameOver||!car.alive) return;
-  if (keys.gas&&car.fuel>0) { gasHold=Math.min(gasHold+1,BOOST_RAMP); const b=1+gasHold/BOOST_RAMP*.4; spin(MAX_WHEEL_SPD*b); car.fuel=Math.max(0,car.fuel-FUEL_RATE); }
+  if (keys.gas&&car.fuel>0) { gasHold=Math.min(gasHold+1,BOOST_RAMP); const b=1+gasHold/BOOST_RAMP*.4; spin(MAX_WHEEL_SPD*b); car.fuel=Math.max(0,car.fuel-FUEL_RATE); spawnExhaust(); }
   else { gasHold=0; if (keys.brake) spin(-MAX_WHEEL_SPD*.4); else spin(0); }
   const th = getTerrainH(car.body.position.x), inAir = car.body.position.y<th-30;
+  if (keys.gas && !inAir && car.fuel>0 && Math.random() < 0.3) {
+    spawnDust(car.wL.position.x, car.wL.position.y);
+    spawnDust(car.wR.position.x, car.wR.position.y);
+  }
   if (inAir) {
     if (keys.tiltFwd) Body.setAngularVelocity(car.body,car.body.angularVelocity-.008);
     if (keys.tiltBwd) Body.setAngularVelocity(car.body,car.body.angularVelocity+.008);
   }
   if (level.extend) level.extend(world,car.body.position.x,2000);
   Engine.update(engine,1000/60);
+  updateParticles();
+  updateSpeedStreaks();
   cameraX=car.body.position.x-W*.3;
   updateClouds(); frame++;
   let a=car.body.angle%(Math.PI*2); if (a>Math.PI) a-=Math.PI*2; if (a<-Math.PI) a+=Math.PI*2;
@@ -440,6 +448,93 @@ function getTerrainH(x) {
   return level.heightAt(x);
 }
 
+function spawnExhaust() {
+  if (!car||!car.alive) return;
+  const ang = car.body.angle;
+  const cx = car.body.position.x;
+  const cy = car.body.position.y;
+  const off = BODY_W/2 + 8;
+  const exhX = cx - Math.cos(ang) * off;
+  const exhY = cy - Math.sin(ang) * off;
+  const spd = 2 + Math.random() * 3;
+  const spread = (Math.random() - 0.5) * 0.6;
+  const boost = gasHold / BOOST_RAMP;
+  const count = 2 + Math.floor(boost * 3);
+  for (let i = 0; i < count; i++) {
+    const t = Math.random();
+    particles.push({
+      x: exhX + (Math.random() - 0.5) * 5,
+      y: exhY + (Math.random() - 0.5) * 5,
+      vx: -Math.cos(ang + 0.4 + spread) * spd * (0.6 + boost * 0.6),
+      vy: -Math.sin(ang + 0.4 + spread) * spd * (0.6 + boost * 0.6) - 0.5,
+      life: 0.15 + Math.random() * 0.3 + boost * 0.2,
+      maxLife: 0.15 + Math.random() * 0.3 + boost * 0.2,
+      size: 4 + Math.random() * 6 + boost * 6,
+      r: 255,
+      g: t < 0.5 ? 100 + Math.random() * 80 : 200 + Math.random() * 55,
+      b: t < 0.3 ? 0 : Math.random() * 40
+    });
+  }
+}
+
+function spawnDust(x, y) {
+  for (let i = 0; i < 2; i++) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 6,
+      y: y + (Math.random() - 0.5) * 4,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: -Math.random() * 1.5 - 0.3,
+      life: 0.4 + Math.random() * 0.3,
+      maxLife: 0.4 + Math.random() * 0.3,
+      size: 2 + Math.random() * 4,
+      r: 140, g: 110, b: 70
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.02;
+    p.life -= 0.016;
+    p.size *= 0.995;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    if (p.x - cameraX < -100 || p.x - cameraX > W + 100) { particles.splice(i, 1); }
+  }
+}
+
+function updateSpeedStreaks() {
+  if (!car||!car.alive) return;
+  const spd = Math.sqrt(car.body.velocity.x**2 + car.body.velocity.y**2);
+  const threshold = 4;
+  if (spd > threshold) {
+    const intensity = Math.min(1, (spd - threshold) / 12);
+    if (Math.random() < intensity * 0.5) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      speedStreaks.push({
+        x: cameraX + (side < 0 ? 0 : W) + (Math.random() - 0.5) * 60,
+        y: 30 + Math.random() * (H - 80),
+        vx: -(2 + Math.random() * 4 + intensity * 6) * side,
+        life: 0.4 + Math.random() * 0.5,
+        maxLife: 0.4 + Math.random() * 0.5,
+        len: 20 + Math.random() * 40 + intensity * 30,
+        w: 1 + Math.random() * 2,
+        op: 0.15 + Math.random() * 0.2 + intensity * 0.15
+      });
+    }
+  }
+  for (let i = speedStreaks.length - 1; i >= 0; i--) {
+    const s = speedStreaks[i];
+    s.x += s.vx;
+    s.life -= 0.016;
+    if (s.life <= 0 || s.x - cameraX < -80 || s.x - cameraX > W + 80) {
+      speedStreaks.splice(i, 1);
+    }
+  }
+}
+
 function endGame(t,s) {
   gameOver=true; ovTitle.textContent=t; ovSub.textContent=s; ovDist.textContent=maxDist; ovScore.textContent=score;
   goTimer=setTimeout(()=>overlay.classList.add('show'),600);
@@ -452,9 +547,11 @@ function endGame(t,s) {
 function render() {
   ctx.clearRect(0,0,W,H);
   drawBG();
+  drawSpeedStreaks();
   drawObjects();
   drawTerrain();
   drawCar();
+  drawParticles();
   drawHUD();
   if (showTiles) { if (tilePage===0) drawTileViewer(); else drawUrbanViewer(); }
 }
@@ -687,6 +784,30 @@ function drawWheel(x,y,angV) {
   }
   // hub
   ctx.fillStyle='#555'; ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+}
+
+function drawSpeedStreaks() {
+  for (const s of speedStreaks) {
+    const sx = s.x - cameraX;
+    const alpha = (s.life / s.maxLife) * s.op;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(sx, s.y - s.w / 2, s.len, s.w);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const sx = p.x - cameraX;
+    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = alpha * 0.7;
+    ctx.fillStyle = `rgb(${p.r|0},${p.g|0},${p.b|0})`;
+    ctx.beginPath();
+    ctx.arc(sx, p.y, Math.max(0.5, p.size), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawHUD() {
