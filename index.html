@@ -175,6 +175,11 @@ const IMG = {
   star: { el: new Image(), path: 'starGold.png',         tw: 39, th: 38 },
   bg:   { el: new Image(), path: 'background.png',       tw: 800,th: 480 },
   car:  { el: new Image(), path: 'noroot1.png',       tw: 1680, th: 456 },
+  s1:{el:new Image(),path:'1.jpg',tw:134,th:72},
+  s2:{el:new Image(),path:'2.jpg',tw:121,th:72},
+  s3:{el:new Image(),path:'3.jpg',tw:128,th:72},
+  s4:{el:new Image(),path:'4.jpg',tw:104,th:72},
+  s5:{el:new Image(),path:'5.jpg',tw:111,th:72},
   corn:{ el: new Image(), path: 'corn.png',   tw: 256, th: 512 },
   cornD:{el: new Image(), path: 'cornD.png',  tw: 256, th: 512 },
   cornY:{el: new Image(), path: 'cornY.png',  tw: 256, th: 512 },
@@ -812,8 +817,14 @@ function drawParticles() {
 
 function drawHUD() {
   if (!car) return;
-  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.font='12px monospace'; ctx.textAlign='left'; ctx.textBaseline='bottom';
-  ctx.fillText('Speed: '+Math.sqrt(car.body.velocity.x**2+car.body.velocity.y**2).toFixed(1),10,H-8);
+  const spd = Math.sqrt(car.body.velocity.x**2+car.body.velocity.y**2);
+  let level = spd < 1 ? 1 : spd < 4 ? 2 : spd < 7 ? 3 : spd < 9 ? 4 : 5;
+  const si = IMG['s'+level];
+  if (si && si.el.naturalWidth) {
+    const sc = 0.88;
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(si.el,0,0,si.tw,si.th,8,60,si.tw*sc,si.th*sc);
+  }
 }
 
 // ───────────────────────────────────────────────────────────
@@ -901,8 +912,8 @@ scaleGame();
 let loaded=0;
 function start(){ initPatterns(); startOverlay.classList.add('show'); }
 function beginGame(){ startOverlay.classList.remove('show'); initGame(); (function loop(){ update(); render(); requestAnimationFrame(loop); })(); }
-function onLoad(){ if (++loaded>=10) start(); }
-function onErr(){ loaded++; if (loaded>=10) start(); }
+function onLoad(){ if (++loaded>=15) start(); }
+function onErr(){ loaded++; if (loaded>=15) start(); }
 for (const k of Object.keys(IMG)) {
   IMG[k].el.onload=onLoad; IMG[k].el.onerror=onErr; IMG[k].el.src=IMG[k].path;
 }
